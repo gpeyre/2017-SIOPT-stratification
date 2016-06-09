@@ -14,4 +14,4 @@ The main functions are, for * in {'l1' 'nuclear'}:
 
 _IMPORTANT:_ this code requires [CVX](cvxr.com) to be installed.
 
-Copyright (c) 2016 Gabriel Peyre
+Copyright &copy; 2016 Gabriel Peyré
