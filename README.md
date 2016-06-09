@@ -1,8 +1,8 @@
 # 2016-SIOPT-stratification
 
-Matlab code to reproduce some of the results of the paper
+Matlab code to reproduce the results of the paper:
 
-> Vincent Duval, Jalal Fadili, Jérôme Malick, Gabriel Peyré
+> Vincent Duval, Jalal Fadili, Jérôme Malick, Gabriel Peyré,
 > Sensitivity Analysis for Mirror-Stratified Convex Functions,
 > Preprint arxiv, 2016.
 
