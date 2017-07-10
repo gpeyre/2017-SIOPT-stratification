@@ -6,7 +6,7 @@ addpath('toolbox/');
 %%
 % Setting.
 
-n = 20; 
+n = 20;
 
 rep = ['results/nuclear/'];
 if not(exist(rep))
@@ -45,6 +45,7 @@ lambda=0.1;
 % solving with BP
 options.niter = 5000;
 options.tau = 1.8/norm(Phi)^2;
+options.report = @(x)0;
 [xfb,Elist] = perform_nucl_reg_fb(y,Phi,lambda, options);
 fprintf('Should be 0: %.3e\n', mynorm(xcvx-xfb)/mynorm(xcvx));
 
@@ -53,10 +54,10 @@ clf;
 plot([svd(xcvx) svd(xfb)], '.-');
 legend('CVX', 'BP');
 
-%% 
+%%
 % Test for minimal norm certificate (aka limitting p when lambda->0)
 
-r = 2; 
+r = 2;
 x0 = LowRank(r);
 y = Phi*x0(:);
 [x,p,eta] = perform_nucl_reg_cvx(y,Phi,0);
@@ -66,25 +67,27 @@ fprintf('Should be 0: %.3e\n', mynorm(x-x0)/mynorm(x0) );
 
 % compare support with extended support
 clf;
-plot([svd(x)/norm(x) svd(eta)], '.-'); 
+plot([svd(x)/norm(x) svd(eta)], '.-');
 axis tight;
 
 %%
 % Phase transition plots.
 
 rlist = 1:8; % 8; % round(P/5);
-nrep = 150*2; % number of replications
+rlist = 4;
+nrep = 1e3; % number of replications
+nrep = 50;
 
 ExactRecovery = []; % recovery 0/1
 RankExcess = []; % exceeding rank
 RankFB = [];
-X0 = []; 
-thresh_exactrecov = 1e-4; 
-thresh_rankexcess = 1e-4; 
+X0 = [];
+thresh_exactrecov = 1e-4;
+thresh_rankexcess = 1e-4;
 for i=1:length(rlist)
     progressbar(i,length(rlist));
     r = rlist(i);
-    for j=1:nrep        
+    for j=1:nrep
         % generate random instance
         x0 = LowRank(r);
         y = Phi*x0(:);
@@ -104,10 +107,10 @@ ExactRecov = sum(ExactRecovery,2)/nrep;
 SupportStab = sum(RankExcess==0,2)/nrep;
 ermax = max(RankExcess(ExactRecovery==1));
 
-%% 
+%%
 % Plot phase transition.
 
-lw = 2; 
+lw = 2;
 ms = 15;
 clf; hold on;
 % legend
@@ -130,16 +133,46 @@ SetAR(2/3);
 set(gca, 'FontSize', 20);
 saveas(gcf, [rep 'phase-transition-progress.eps'], 'epsc');
 
+
 %%
-% FB tests
+% Histogram of low-complexity index.
+
+% target low-complexity index
+r = 4;
+
+% compute histograms of identified manifold dimensions
+S = RankExcess(rlist==r,:);
+s = 0:max(S(:));
+h = hist(S(:), s);
+h = h/sum(h);
+clf; hold on;
+for i=1:length(s)
+    t = (i-1)/(length(s)-1);
+    col = [t 0 1-t];
+    bar(s(i), h(i), 'Facecolor', col, 'EdgeColor', col);
+end
+set(gca, 'FontSize', 20);
+SetAR(2/3);
+box on;
+axis tight;
+saveas(gcf, [rep 'histogram-low-complexity.eps'], 'epsc');
+saveas(gcf, [rep 'histogram-low-complexity.png'], 'png');
+
+
+%%
+% FB/DR tests
+
+algo = 'fb';
+algo = 'dr';
 
 % FB param
 options.niter = 2000;
 options.tau = 1.8/norm(Phi)^2;
-options.repport = @(x)sum(svd(x)>1e-6);
+options.report = @(x)sum(svd(x)>1e-6);
 lambda = 10; % for r=4
-
-r = 4; 
+sigma = .1;
+% DR param
+options.gamma = 1;
 
 % target excess
 er_list = [0 3];
@@ -152,9 +185,16 @@ for i=1:length(er_list)
     SupportFB{i} = [];
     for j=I
         x0 = X0(:,:,rlist==r,j);
-        y = Phi*x0(:);
-        % perform FB
-        [xfb,Elist,G] = perform_nucl_reg_fb(y,Phi,lambda, options);
+        w = sigma*randn(P,1);
+        y = Phi*x0(:)+w;
+        % perform FB/DR
+        switch algo
+            case 'fb'
+                [xfb,Elist,G] = perform_nucl_reg_fb(y,Phi,lambda, options);
+            case 'dr'
+                [xfb,Elist,G] = perform_nucl_reg_dr(y,Phi,lambda, options);
+        end
+
         SupportFB{i}(:,end+1) = G(:);
     end
     SupportFB{i} = max(SupportFB{i}, r+er);
@@ -186,7 +226,7 @@ saveas(gcf, [rep 'fb-iterations.eps'], 'epsc' );
 saveas(gcf, [rep 'fb-iterations.png'], 'png' );
 
 %%
-% Singes out samples. 
+% Singes out samples.
 
 lgd = {};
 clf; hold on;

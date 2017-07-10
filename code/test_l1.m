@@ -1,5 +1,5 @@
 %%
-% test for extended support of nuclear norm regularization.
+% test for extended support of L1 norm regularization.
 
 addpath('toolbox/');
 
@@ -12,7 +12,6 @@ rep = ['results/l1/'];
 if not(exist(rep))
     mkdir(rep);
 end
-
 
 % number of measurements
 P = round(N/2);
@@ -72,7 +71,8 @@ axis tight;
 
 rlist = 1:30;
 rlist = 10;
-nrep = 300; % number of replications
+nrep = 1e3; % number of replications
+nrep = 150;
 
 ExactRecovery = []; % recovery 0/1
 SupportExcess = []; % exceeding support
@@ -121,20 +121,52 @@ set(gca, 'FontSize', 20);
 saveas(gcf, [rep 'phase-transition-progress.eps'], 'epsc');
 
 %%
-% FB tests
+% Histogram of low-complexity index.
+
+% target low-complexity index
+r = 10;
+
+% compute histograms of identified manifold dimensions
+S = SupportExcess(rlist==r,:);
+s = 0:min(20,max(S(:)));
+h = hist(S(:), s); h(end)=0;
+h = h/sum(h);
+clf; hold on;
+for i=1:length(s)
+    t = (i-1)/(length(s)-1);
+    col = [t 0 1-t];
+    bar(s(i), h(i), 'Facecolor', col, 'EdgeColor', col);
+end
+set(gca, 'FontSize', 20);
+SetAR(2/3);
+box on;
+axis tight;
+saveas(gcf, [rep 'histogram-low-complexity.eps'], 'epsc');
+saveas(gcf, [rep 'histogram-low-complexity.png'], 'png');
+
+%%
+% FB/DR tests
+
+% target excess
+er_list = [0 10];
+
+algo = 'dr';
+algo = 'fb';
 
 % FB param
 options.niter = 2000;
 options.tau = 1.8/norm(Phi)^2;
-options.repport = @(x)sum(abs(x)>1e-6);
-lambda = .28; % for r=4
+options.report = @(x)sum(abs(x)>1e-6);
+options.verb = 0;
+lambda = .28; % for s=10
+sigma = .1;
+% DR param
+options.gamma = 1;
+if strcmp(algo, 'dr') %DR converges very fast
+    options.niter = 600;
+end
 
-% target sparsity
-r = 10;
-% target excess
-er_list = [0 10];
-
-% compute FB solutions
+% compute FB/DR solutions
 SupportFB = {};
 for i=1:length(er_list)
     er = er_list(i);
@@ -143,9 +175,15 @@ for i=1:length(er_list)
     SupportFB{i} = [];
     for j=I
         x0 = X0(:,rlist==r,j);
-        y = Phi*x0;
-        % perform FB
-        [xfb,Elist,G] = perform_l1_reg_fb(y,Phi,lambda, options);
+        w = 1e-3*randn(P,1);
+        y = Phi*x0+w;
+        % perform FB/DR
+        switch algo
+            case 'fb'
+                [xfb,Elist,G] = perform_l1_reg_fb(y,Phi,lambda, options);
+            case 'dr'
+                [xfb,Elist,G] = perform_l1_reg_dr(y,Phi,lambda, options);
+        end
         SupportFB{i}(:,end+1) = G(:);
     end
 end
@@ -173,12 +211,16 @@ axis([1 options.niter 0 N]);
 SetAR(2/3);
 box on; drawnow;
 set(gca, 'FontSize', 20);
-saveas(gcf, [rep 'fb-iterations.eps'], 'epsc' );
-saveas(gcf, [rep 'fb-iterations.png'], 'png' );
+addstr = '';
+if strcmp(algo, 'dr')
+    addstr = ['-gamma' num2str(round(1000*options.gamma))];
+end
+saveas(gcf, [rep algo '-iterations' addstr '.eps'], 'epsc' );
+saveas(gcf, [rep algo '-iterations' addstr '.png'], 'png' );
 
 
 %%
-% Singes out samples. 
+% Singes out samples.
 
 lgd = {};
 clf; hold on;
@@ -195,5 +237,5 @@ axis([1 options.niter r-1 N]);
 SetAR(2/3);
 box on; drawnow;
 set(gca, 'FontSize', 20);
-saveas(gcf, [rep 'fb-iterations-single.eps'], 'epsc' );
-saveas(gcf, [rep 'fb-iterations-single.png'], 'png' );
+saveas(gcf, [rep algo '-iterations-single.eps'], 'epsc' );
+saveas(gcf, [rep algo '-iterations-single.png'], 'png' );
